@@ -211,6 +211,18 @@ const server = createServer(async (req, res) => {
       }
       return;
     }
+    if (componentsMatch && method === "DELETE") {
+      const site = safeName(componentsMatch[1]!);
+      const filePath = join(DATA_DIR, site, "components.html");
+      assertInsideDataDir(filePath);
+      if (existsSync(filePath)) {
+        await unlink(filePath);
+        sendJson(res, { ok: true });
+      } else {
+        sendJson(res, { error: "No components file" }, 404);
+      }
+      return;
+    }
 
     // ─── API: instructions.md ────────────────
 
@@ -280,6 +292,8 @@ async function handleCapture(req: IncomingMessage, res: ServerResponse) {
       title?: string;
       timestamp?: number;
       captureType?: string;
+      elementTag?: string;
+      elementDimensions?: string;
     };
 
     if (!body.url || !body.data) {
@@ -290,6 +304,19 @@ async function handleCapture(req: IncomingMessage, res: ServerResponse) {
     if (body.captureType === "power") {
       const result = await savePowerCapture(body.url, body.data, body.title);
       console.log(`  \x1b[32m+\x1b[0m ${result.siteName}/${result.filename} (${result.sizeKB}KB)`);
+      sendJson(res, {
+        success: true,
+        site: result.siteName,
+        filename: result.filename,
+        sizeKB: result.sizeKB,
+      });
+      return;
+    }
+
+    // Element capture: single element with its CSS
+    if (body.captureType === "element") {
+      const result = await saveElementCapture(body.url, body.data, body.title, body.elementTag, body.elementDimensions);
+      console.log(`  \x1b[32m+\x1b[0m ${result.siteName}/${result.filename} (${result.sizeKB}KB) [element: <${body.elementTag}>]`);
       sendJson(res, {
         success: true,
         site: result.siteName,
@@ -319,6 +346,7 @@ async function handleListSites(res: ServerResponse) {
       const files = await readdir(siteDir);
 
       const captures = files.filter((f) => f.startsWith("capture-") && f.endsWith(".html"));
+      const elements = files.filter((f) => f.startsWith("element-") && f.endsWith(".html"));
       const hasDesignMd = files.includes("design.md");
       const hasComponents = files.includes("components.html");
 
@@ -339,12 +367,29 @@ async function handleListSites(res: ServerResponse) {
         });
       }
 
+      const elementCaptures = [];
+      for (const el of elements) {
+        let captureKB = "?";
+        try {
+          const s = await stat(join(siteDir, el));
+          captureKB = (s.size / 1024).toFixed(0);
+        } catch {}
+
+        elementCaptures.push({
+          capture: el,
+          slug: el.replace(".html", ""),
+          captureKB,
+        });
+      }
+
       sites.push({
         name: siteName,
         pages,
+        elements: elementCaptures,
         hasDesignMd,
         hasComponents,
         pageCount: pages.length,
+        elementCount: elementCaptures.length,
       });
     }
 
@@ -512,20 +557,68 @@ async function handleAgentPrompt(siteName: string, res: ServerResponse) {
       ``,
       `## YOUR TASK`,
       ``,
-      `Generate the components.html file using PARALLEL sub-agents. Launch these ALL AT ONCE:`,
+      `Generate a single components.html file saved to: ${componentsPath}`,
       ``,
-      `1. **Sub-agent: Layouts** — Read 2-3 HTML files to extract page layout structures (sidebar+main, settings, detail views). Write to ${join(siteDir, "_section-layouts.html")}`,
-      `2. **Sub-agent: Colors + Typography** — Use the pre-extracted CSS vars above. No file reads needed. Write to ${join(siteDir, "_section-colors-typo.html")}`,
-      `3. **Sub-agent: Navigation + Sidebar** — Read ONE file (home) for sidebar SVGs. Write to ${join(siteDir, "_section-nav.html")}`,
-      `4. **Sub-agent: Buttons + Forms + Controls** — Read settings files for toggles, inputs, selects. Write to ${join(siteDir, "_section-controls.html")}`,
-      `5. **Sub-agent: Cards + Lists + Content** — Read plugins, tasks, chat files. Write to ${join(siteDir, "_section-content.html")}`,
+      `The file MUST have THREE sections in this exact order:`,
       ``,
-      `Each sub-agent writes a plain HTML fragment (just the component sections, no <html>/<head>/<body> wrapper).`,
+      `### SECTION 1: Atomic Tokens & UI Components`,
+      `Small, reusable primitives. For each, show every variant found in the source pages.`,
+      `- **Color Palette** — swatches for all backgrounds, text colors, accent/status, border weights. Show exact hex/rgba values.`,
+      `- **Typography** — every font-size/weight combo used, font families, section header style.`,
+      `- **Buttons** — every variant: default (rounded-lg), pill (rounded-full), ghost/tertiary, accent, link. Show hover states, disabled.`,
+      `- **Toggle Switches** — checked/unchecked/disabled states with exact dimensions.`,
+      `- **Select/Dropdown triggers** — the trigger button with chevron, exact width and bg.`,
+      `- **Inputs** — search input with icon, text inputs with focus ring.`,
+      `- **Radio Cards** — grid of selectable cards with radio dot indicator, active/inactive states.`,
+      `- **Keyboard shortcuts** — kbd badges with exact styling.`,
+      `- **Border radius scale** — visual samples of each radius value used.`,
       ``,
-      `After ALL sub-agents complete, assemble the final file:`,
+      `### SECTION 2: Assembled Sections`,
+      `These show how atomic components combine into the LARGER VISIBLE BLOCKS on each page.`,
+      `This is CRITICAL — without these, an agent has no idea how components fit together.`,
       ``,
-      `\`\`\`bash`,
-      `cat << 'HEADER' > ${componentsPath}`,
+      `For each unique section visible across the captured pages, create an exact replica:`,
+      `- **Main Sidebar** — full height, with header buttons, nav items (with icons, kbd badges), project/chat lists with timestamps, section toggles, footer. Exact width, bg color, border.`,
+      `- **Settings Sidebar** — "Back to app" link, search input, section group labels (Personal, Integrations, Coding, etc.), nav items with active state highlight.`,
+      `- **Settings Content Panel** — centered max-width container with page heading, section groups. Each group has a label + a card (panel bg, border, rounded-lg) with rows separated by light borders. Rows contain: label + description on left, control (toggle/dropdown/button) on right.`,
+      `- **Home Hero + Composer** — centered heading, composer input with toolbar (attach, approval selector, model picker, mic, send), suggestion pills below.`,
+      `- **Popover/Dropdown Menu** — elevated bg with backdrop-blur, ring border, menu items with icons + descriptions, checkmark on active item.`,
+      `- **Any other large visible section** unique to the captured pages (chat thread, file tree, detail panels, etc.)`,
+      ``,
+      `Each assembled section should be a self-contained block that could be dropped into a page.`,
+      `Include ALL real content from the source — every nav item, every label, every icon.`,
+      ``,
+      `### SECTION 3: Full Page Layouts`,
+      `Show how sections assemble into COMPLETE pages. One frame per unique page type.`,
+      ``,
+      `For each captured page type, create a bordered frame showing the full layout:`,
+      `- Exact sidebar + main content split with correct widths`,
+      `- Correct background colors for each region`,
+      `- Content centered with the correct max-width`,
+      `- Real content from the source, not placeholders`,
+      `- Include a description comment above each frame noting: sidebar width, content max-width, vertical positioning (e.g., "hero at 39% from top")`,
+      ``,
+      `At the end, include a **Layout Reference** card summarizing key measurements:`,
+      `- Sidebar width(s)`,
+      `- Content max-width(s)`,
+      `- Page background, sidebar background, panel/card background, popover background, composer background`,
+      `- Active item background color`,
+      `- Heading sizes used for page titles`,
+      ``,
+      `## HOW TO BUILD IT`,
+      ``,
+      `Use PARALLEL sub-agents. Launch these ALL AT ONCE:`,
+      ``,
+      `1. **Sub-agent: Colors + Typography** — Use the pre-extracted CSS vars above. No file reads needed. Write to ${join(siteDir, "_section-colors-typo.html")}`,
+      `2. **Sub-agent: UI Components** — Read 1-2 HTML files (home + settings) for buttons, toggles, inputs, selects, radio cards, kbd badges. Write to ${join(siteDir, "_section-controls.html")}`,
+      `3. **Sub-agent: Assembled Sections** — Read HTML files for sidebar structure, settings panel, composer, popovers. Copy exact SVG icons. Write to ${join(siteDir, "_section-assembled.html")}`,
+      `4. **Sub-agent: Full Page Layouts** — Read HTML files for overall page structure, widths, positioning. Write to ${join(siteDir, "_section-pages.html")}`,
+      ``,
+      `Each sub-agent writes a plain HTML fragment (just the sections, no <html>/<head>/<body> wrapper).`,
+      ``,
+      `After ALL sub-agents complete, assemble the final file by writing to ${componentsPath}:`,
+      ``,
+      `\`\`\``,
       `<!DOCTYPE html>`,
       `<html class="dark">`,
       `<head>`,
@@ -533,29 +626,40 @@ async function handleAgentPrompt(siteName: string, res: ServerResponse) {
       `<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>`,
       `<style type="text/tailwindcss">`,
       `@theme {`,
-      `  /* Color tokens will be filled from sub-agent 2 output */`,
+      `  /* All color tokens from the Colors sub-agent */`,
       `}`,
       `</style>`,
+      `<style>`,
+      `  /* Any custom CSS needed (toggle switches, etc.) */`,
+      `</style>`,
       `</head>`,
-      `<body class="bg-[var(--page-bg)] text-[var(--text-primary)] p-6" style="font-family: FONT_FROM_VARS">`,
-      `HEADER`,
-      `cat ${join(siteDir, "_section-layouts.html")} >> ${componentsPath}`,
-      `cat ${join(siteDir, "_section-colors-typo.html")} >> ${componentsPath}`,
-      `cat ${join(siteDir, "_section-nav.html")} >> ${componentsPath}`,
-      `cat ${join(siteDir, "_section-controls.html")} >> ${componentsPath}`,
-      `cat ${join(siteDir, "_section-content.html")} >> ${componentsPath}`,
-      `echo '</body></html>' >> ${componentsPath}`,
+      `<body class="bg-[PAGE_BG] text-[TEXT_PRIMARY] p-8" style="font-family: FONT_FROM_VARS; font-weight: DEFAULT_WEIGHT">`,
+      ``,
+      `<!-- SECTION 1: Atomic Tokens & UI Components -->`,
+      `[Colors + Typography sub-agent output]`,
+      `[UI Components sub-agent output]`,
+      ``,
+      `<!-- SECTION 2: Assembled Sections -->`,
+      `[Assembled Sections sub-agent output]`,
+      ``,
+      `<!-- SECTION 3: Full Page Layouts -->`,
+      `[Full Page Layouts sub-agent output]`,
+      ``,
+      `</body>`,
+      `</html>`,
       `\`\`\``,
       ``,
-      `Then update the @theme block in the assembled file with the actual color tokens from the Colors sub-agent output.`,
+      `Fill in the @theme block, page bg, text color, and font from the extracted CSS vars.`,
       ``,
       `## RULES`,
-      `- NEVER fabricate content — every word from source`,
-      `- NEVER use generic Tailwind colors — use exact values from CSS vars`,
+      `- NEVER fabricate content — every word, icon, label, and color must come from the source HTML`,
+      `- NEVER use generic Tailwind colors (blue-500, gray-200) — always use exact values like bg-[#141414] or text-[rgba(255,255,255,0.71)]`,
       `- NEVER strip or approximate SVG icons — copy EXACT <svg> with all <path d="..."> from source files`,
       `- If you cannot find an SVG, use <!-- icon: NAME --> placeholder, do NOT guess`,
-      `- Full width layout, left aligned, no centering`,
-      `- No wrapper borders around sections`,
+      `- All colors as inline style values or arbitrary Tailwind values — not theme references`,
+      `- Assembled sections must include ALL content from the source (every nav item, every settings row)`,
+      `- Page layouts must show correct widths, max-widths, and positioning`,
+      `- Interactive elements (toggles, hover states) should work via inline JS or CSS :hover`,
       ``,
       `## ALSO SAVE:`,
       `Save instructions file to: ${join(siteDir, "instructions.md")}`,
@@ -632,6 +736,31 @@ async function handleDeleteSite(siteName: string, res: ServerResponse) {
   } catch (err: any) {
     sendJson(res, { error: "Delete failed" }, 500);
   }
+}
+
+// ─── Save element capture ─────────────────────────
+
+async function saveElementCapture(pageUrl: string, htmlData: string, title?: string, elementTag?: string, dimensions?: string) {
+  const parsed = new URL(pageUrl);
+  const siteName = safeName(parsed.hostname.replace(/^www\./, "").toLowerCase());
+  const pathSlug = parsed.pathname.replace(/^\/|\/$/g, "").replace(/\//g, "-") || "home";
+  const tag = elementTag || "element";
+  const ts = Date.now();
+
+  if (!siteName) throw new Error("Invalid site name");
+
+  const siteDir = join(DATA_DIR, siteName);
+  assertInsideDataDir(siteDir);
+  await mkdir(siteDir, { recursive: true });
+
+  const filename = `element-${pathSlug}-${tag}-${ts}.html`;
+  await writeFile(join(siteDir, filename), htmlData, "utf-8");
+
+  return {
+    siteName,
+    filename,
+    sizeKB: (htmlData.length / 1024).toFixed(0),
+  };
 }
 
 // ─── Save power capture (new) ─────────────────────

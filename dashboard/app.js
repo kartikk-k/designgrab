@@ -531,22 +531,26 @@ async function renderComponentsTab(site) {
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Instructions
           </button>
+          <button type="button" class="${BTN_ACCENT}" style="height:28px;font-size:11px;padding:0 12px;" data-action="open-tab">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Open in new tab
+          </button>
+          <button type="button" style="height:28px;font-size:11px;padding:0 10px;border-radius:6px;border:1px solid rgba(255,255,255,0.08);background:transparent;color:rgba(255,255,255,0.4);cursor:pointer;display:inline-flex;align-items:center;" data-action="delete-components" title="Delete components file">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
           <span class="md-section-meta">${(html.length / 1024).toFixed(1)} KB</span>
         </div>
       `;
       header.querySelector('[data-action="dl-components"]')?.addEventListener("click", () => downloadComponents(site.name));
       header.querySelector('[data-action="dl-instructions"]')?.addEventListener("click", () => downloadInstructions(site.name));
+      header.querySelector('[data-action="open-tab"]')?.addEventListener("click", () => window.open(`${API}/api/sites/${encodeURIComponent(site.name)}/components`, "_blank"));
+      header.querySelector('[data-action="delete-components"]')?.addEventListener("click", () => deleteComponents(site.name));
       container.insertBefore(header, content);
 
-      // Render in iframe for proper isolation (Tailwind needs its own context)
+      // Render via src URL (not srcdoc) so external scripts like Tailwind CDN load correctly
       content.className = "preview-frame-retool";
       content.style.height = "calc(100vh - 12rem)";
-      const iframe = document.createElement("iframe");
-      iframe.srcdoc = html;
-      iframe.sandbox = "allow-same-origin";
-      iframe.style.cssText = "width:100%;height:100%;border:0;border-radius:6px;";
-      content.innerHTML = "";
-      content.appendChild(iframe);
+      content.innerHTML = `<iframe src="${API}/api/sites/${encodeURIComponent(site.name)}/components" style="width:100%;height:100%;border:0;border-radius:6px;"></iframe>`;
     } else {
       content.className = "panel-block";
       content.innerHTML = "";
@@ -583,6 +587,18 @@ function downloadComponents(siteName) {
   a.href = `${API}/api/sites/${encodeURIComponent(siteName)}/components`;
   a.download = `${siteName}-components.html`;
   a.click();
+}
+
+async function deleteComponents(siteName) {
+  if (!confirm("Delete components.html? You can regenerate it later.")) return;
+  try {
+    const res = await fetch(`${API}/api/sites/${encodeURIComponent(siteName)}/components`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to delete");
+    showToast("Components file deleted", "success");
+    loadSites();
+  } catch (e) {
+    showToast("Failed: " + e.message, "error");
+  }
 }
 
 function downloadInstructions(siteName) {

@@ -78,6 +78,11 @@
       background: #0171e3;
       color: #fff;
     }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: rgba(255, 255, 255, 0.8);
+      border: 0.5px solid rgba(255, 255, 255, 0.1);
+    }
 
     /* Hint text */
     .hint {
@@ -169,16 +174,17 @@
     <span id="statusText">Checking server...</span>
   </div>
 
-  <button class="btn btn-primary" id="capturePage" disabled>
-    Capture This Page
-  </button>
+  <div style="display: flex; flex-direction: column; gap: 6px;">
+    <button class="btn btn-primary" id="capturePage" disabled>
+      Capture Full Page
+    </button>
+    <button class="btn btn-secondary" id="captureElement" disabled>
+      Select Element
+    </button>
+  </div>
 
-  <button class="btn" id="captureSection" disabled style="display:none">
-    Select Section
-  </button>
-
-  <div class="hint">
-    Captures the entire page with all CSS inlined and sends to your local server.
+  <div class="hint" id="hintText">
+    Captures the entire page or a single element with only its relevant CSS.
   </div>
 
   <div class="result" id="result"></div>

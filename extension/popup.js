@@ -3,7 +3,7 @@
 const statusDot = document.getElementById("statusDot");
 const statusText = document.getElementById("statusText");
 const capturePageBtn = document.getElementById("capturePage");
-const captureSectionBtn = document.getElementById("captureSection");
+const captureElementBtn = document.getElementById("captureElement");
 const resultDiv = document.getElementById("result");
 const serverUrlInput = document.getElementById("serverUrl");
 
@@ -31,6 +31,7 @@ async function checkServer() {
       statusDot.classList.add("connected");
       statusText.textContent = "Server connected";
       capturePageBtn.disabled = false;
+      captureElementBtn.disabled = false;
       return true;
     }
   } catch (e) {
@@ -39,6 +40,7 @@ async function checkServer() {
   statusDot.classList.remove("connected");
   statusText.textContent = "Server offline — run: npx designgrab";
   capturePageBtn.disabled = true;
+  captureElementBtn.disabled = true;
   return false;
 }
 
@@ -444,5 +446,125 @@ capturePageBtn.addEventListener("click", async () => {
   }
 });
 
-// Hide section button — not needed for power capture
-captureSectionBtn.style.display = "none";
+// ─── Element Capture ───────────────────────────────
+
+captureElementBtn.addEventListener("click", async () => {
+  const connected = await checkServer();
+  if (!connected) return;
+
+  captureElementBtn.disabled = true;
+  capturePageBtn.disabled = true;
+  resultDiv.className = "result";
+  resultDiv.style.display = "none";
+
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (!tab?.id) throw new Error("No active tab");
+    log("Element capture on tab:", tab.id, tab.url);
+
+    const serverUrl = serverUrlInput.value;
+    const tabUrl = tab.url;
+    const tabTitle = tab.title;
+
+    // Inject the element picker script
+    statusText.textContent = "Pick an element...";
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      files: ["element-capture.js"],
+      world: "MAIN",
+    });
+
+    // Close the popup — user needs to interact with the page
+    // Poll for result from a background context
+    // Since we can't keep the popup open while user clicks,
+    // we'll poll from the popup before it closes.
+    // Actually, let's use a different approach: inject and poll.
+
+    // We need to keep checking for the result
+    statusText.textContent = "Click an element on the page (Esc to cancel)";
+
+    const pollForResult = async () => {
+      const maxAttempts = 600; // 60 seconds
+      for (let i = 0; i < maxAttempts; i++) {
+        await new Promise(r => setTimeout(r, 100));
+        try {
+          const results = await chrome.scripting.executeScript({
+            target: { tabId: tab.id },
+            func: () => {
+              const r = window.__DG_ELEMENT_RESULT__;
+              if (r) {
+                window.__DG_ELEMENT_RESULT__ = null;
+                return r;
+              }
+              return null;
+            },
+            world: "MAIN",
+          });
+          const result = results[0]?.result;
+          if (result) return result;
+        } catch {
+          // Tab may have been closed
+          return { error: "Tab closed or unavailable" };
+        }
+      }
+      return { error: "Timeout — no element selected" };
+    };
+
+    const elementResult = await pollForResult();
+
+    if (elementResult.cancelled) {
+      statusText.textContent = "Cancelled";
+      captureElementBtn.disabled = false;
+      capturePageBtn.disabled = false;
+      return;
+    }
+
+    if (elementResult.error) {
+      throw new Error(elementResult.error);
+    }
+
+    log("Element captured:", elementResult.tag, elementResult.dimensions, elementResult.sizeKB + "KB");
+    statusText.textContent = "Sending to server...";
+
+    // Send to server
+    const res = await fetch(`${serverUrl}/capture`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        url: tabUrl,
+        data: elementResult.html,
+        title: tabTitle,
+        timestamp: Date.now(),
+        captureType: "element",
+        elementTag: elementResult.tag,
+        elementDimensions: elementResult.dimensions,
+      }),
+    });
+
+    const result = await res.json();
+    log("Server response:", result);
+    if (result.error) throw new Error(result.error);
+
+    statusText.textContent = "Element captured!";
+    resultDiv.className = "result show success";
+    resultDiv.textContent = "";
+    const strong = document.createElement("strong");
+    strong.textContent = result.site;
+    resultDiv.appendChild(strong);
+    resultDiv.appendChild(document.createElement("br"));
+    resultDiv.appendChild(
+      document.createTextNode(
+        `Saved: ${result.filename} (${result.sizeKB}KB) — <${elementResult.tag}> ${elementResult.dimensions}`
+      )
+    );
+    captureElementBtn.disabled = false;
+    capturePageBtn.disabled = false;
+  } catch (err) {
+    log("Element capture error:", err.message, err.stack);
+    statusText.textContent = "Error";
+    resultDiv.className = "result show error";
+    resultDiv.textContent = err.message;
+    captureElementBtn.disabled = false;
+    capturePageBtn.disabled = false;
+  }
+});
