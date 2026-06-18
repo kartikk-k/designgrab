@@ -88,7 +88,7 @@ export default function GettingStartedPage() {
                 overflowX: "auto",
               }}
             >
-              <code>git clone https://github.com/nicepkg/designgrab</code>
+              <code>git clone https://github.com/kartikk-k/designgrab</code>
               <br />
               <code>cd designgrab && bun install</code>
               <br />

@@ -1,5 +1,5 @@
 /**
- * Public designgrab collections — mirrors `.data/<slug>/` in github.com/nicepkg/designgrab
+ * Public designgrab collections — mirrors `.data/<slug>/` in github.com/kartikk-k/designgrab
  */
 
 export type CollectionExample = {

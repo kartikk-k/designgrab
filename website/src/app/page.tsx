@@ -142,7 +142,7 @@ export default function Home() {
               Install Extension
             </a>
             <a
-              href="https://github.com/nicepkg/designgrab"
+              href="https://github.com/kartikk-k/designgrab"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center no-underline"
@@ -448,7 +448,7 @@ export default function Home() {
             Design Grab is open source and free to use. Contribute, extend, or self-host it yourself.
           </p>
           <a
-            href="https://github.com/nicepkg/designgrab"
+            href="https://github.com/kartikk-k/designgrab"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center justify-center no-underline"

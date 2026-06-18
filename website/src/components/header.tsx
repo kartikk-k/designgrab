@@ -49,7 +49,7 @@ export function Header() {
             Docs
           </Link>
           <a
-            href="https://github.com/nicepkg/designgrab"
+            href="https://github.com/kartikk-k/designgrab"
             target="_blank"
             rel="noopener noreferrer"
             className="no-underline hidden sm:block"
