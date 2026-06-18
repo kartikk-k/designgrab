@@ -17,7 +17,7 @@ export function Footer() {
           <span style={headingStyle}>Product</span>
           <Link href="/collections" className="no-underline" style={linkStyle}>Collections</Link>
           <Link href="/docs" className="no-underline" style={linkStyle}>Documentation</Link>
-          <a href="#install" className="no-underline" style={linkStyle}>Chrome Extension</a>
+          <a href="https://chromewebstore.google.com/detail/mnnjngmbigmldgnpfomjbioediaehdgj?utm_source=item-share-cb" target="_blank" rel="noopener noreferrer" className="no-underline" style={linkStyle}>Chrome Extension</a>
         </div>
         <div className="flex flex-col" style={{ gap: "12px" }}>
           <span style={headingStyle}>Resources</span>
