@@ -60,7 +60,9 @@ export function Header() {
         </nav>
         <div className="flex items-center" style={{ gap: "12px" }}>
           <a
-            href="#install"
+            href="https://chromewebstore.google.com/detail/mnnjngmbigmldgnpfomjbioediaehdgj?utm_source=item-share-cb"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center justify-center gap-2 no-underline group"
             style={{
               height: "40px",

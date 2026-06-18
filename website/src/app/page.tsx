@@ -124,7 +124,9 @@ export default function Home() {
           </p>
           <div className="flex items-center flex-wrap justify-center" style={{ gap: "12px" }}>
             <a
-              href="#install"
+              href="https://chromewebstore.google.com/detail/mnnjngmbigmldgnpfomjbioediaehdgj?utm_source=item-share-cb"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center justify-center no-underline"
               style={{
                 height: "40px",
@@ -397,7 +399,7 @@ export default function Home() {
               Install the extension and start capturing design systems from any website you visit.
             </p>
             <a
-              href="https://chrome.google.com/webstore"
+              href="https://chromewebstore.google.com/detail/mnnjngmbigmldgnpfomjbioediaehdgj?utm_source=item-share-cb"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center no-underline"
