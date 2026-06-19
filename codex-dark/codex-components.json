@@ -1,0 +1,57 @@
+[
+  {
+    "name": "Sidebar",
+    "selector": "#root aside",
+    "description": "Full sidebar with nav buttons, project list, and chat items"
+  },
+  {
+    "name": "SidebarNav",
+    "selector": "nav[aria-label=\"Automation folders\"] > div > div > div",
+    "description": "Top nav: New chat, Search, Plugins, Automations buttons with keyboard shortcuts"
+  },
+  {
+    "name": "ProjectListItem",
+    "selector": "[role=\"list\"] [role=\"listitem\"]:first-child",
+    "description": "Single project with name, collapse button, and nested chat items"
+  },
+  {
+    "name": "SettingsSidebar",
+    "selector": "nav[aria-label=\"Settings\"]",
+    "description": "Settings navigation: sections (Personal, Integrations, Coding, Archived) with nav items"
+  },
+  {
+    "name": "SettingsNavItem",
+    "selector": "nav[aria-label=\"Settings\"] button[aria-label=\"General\"]",
+    "description": "Single settings nav item with icon and label"
+  },
+  {
+    "name": "SettingsSection",
+    "selector": "nav[aria-label=\"Settings\"] ~ div section:first-of-type",
+    "description": "Settings section with heading, description, and radio/toggle controls"
+  },
+  {
+    "name": "SettingsToggleRow",
+    "selector": "[role=\"switch\"]:first-of-type",
+    "description": "Single toggle switch control"
+  },
+  {
+    "name": "RadioGroup",
+    "selector": "[role=\"radiogroup\"]",
+    "description": "Radio button group (e.g. Work mode selector)"
+  },
+  {
+    "name": "SettingsContent",
+    "selector": "nav[aria-label=\"Settings\"] ~ div",
+    "description": "Full settings content panel with all sections"
+  },
+  {
+    "name": "MainContent",
+    "selector": "#root aside ~ div",
+    "description": "Main content area (right side of sidebar)"
+  },
+  {
+    "name": "ChatThread",
+    "selector": "#root aside ~ div > div",
+    "description": "Chat thread area with messages"
+  }
+]

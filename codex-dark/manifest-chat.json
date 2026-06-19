@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Sidebar",
+    "selector": "aside",
+    "description": "Full sidebar with nav, projects, and chat list"
+  },
+  {
+    "name": "MainContent",
+    "selector": "main",
+    "description": "Full main content area with chat thread"
+  },
+  {
+    "name": "Header",
+    "selector": "main > header",
+    "description": "App header bar"
+  },
+  {
+    "name": "ChatArea",
+    "selector": "main > div:nth-child(2)",
+    "description": "Chat thread with messages and file tree"
+  }
+]

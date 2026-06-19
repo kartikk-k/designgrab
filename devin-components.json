@@ -1,0 +1,62 @@
+[
+  {
+    "name": "Sidebar",
+    "selector": "[data-slot=\"sidebar\"]",
+    "description": "Full sidebar with header, navigation, session list, and footer"
+  },
+  {
+    "name": "SidebarHeader",
+    "selector": "[data-slot=\"sidebar-header\"]",
+    "description": "User avatar/name dropdown, search button, and sidebar toggle"
+  },
+  {
+    "name": "SidebarNavItem",
+    "selector": "[data-slot=\"sidebar-header\"] nav li:first-child",
+    "description": "Single nav item (Sessions) with icon and label — representative of all nav items"
+  },
+  {
+    "name": "SidebarSectionLabel",
+    "selector": "[data-slot=\"sidebar-label-row\"]",
+    "description": "Section header row: 'Recent' label with Search, New, and More action buttons"
+  },
+  {
+    "name": "SessionListItem",
+    "selector": "[data-slot=\"sidebar-group-content\"] li:first-child",
+    "description": "Session entry with title, status badge, PR link, and two-line layout"
+  },
+  {
+    "name": "SidebarFooter",
+    "selector": "[data-slot=\"sidebar-footer\"]",
+    "description": "Footer with Upgrade, Settings, Download apps, and Help buttons"
+  },
+  {
+    "name": "PageHeader",
+    "selector": "#content header",
+    "description": "Top bar with breadcrumb navigation and action buttons"
+  },
+  {
+    "name": "Composer",
+    "selector": "[data-flash-channel=\"new-session\"]",
+    "description": "Full composer card: CLI banner, rich text input, toolbar with Agent selector"
+  },
+  {
+    "name": "ComposerInput",
+    "selector": "[data-devin-input-box=\"true\"]",
+    "description": "Rich text input area with placeholder text"
+  },
+  {
+    "name": "ComposerToolbar",
+    "selector": "[data-slot=\"scroll-area\"]",
+    "description": "Agent mode selector, context button, overflow menu, and send controls"
+  },
+  {
+    "name": "ContentPanel",
+    "selector": "#content",
+    "description": "Main content area with header, composer, and status bar"
+  },
+  {
+    "name": "FullLayout",
+    "selector": "#app > div > div > div > div",
+    "description": "Complete page layout: sidebar + separator + content panel"
+  }
+]

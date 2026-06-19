@@ -1,0 +1,32 @@
+[
+  {
+    "name": "Sidebar",
+    "selector": "aside",
+    "description": "Full sidebar with nav, projects, and chat list"
+  },
+  {
+    "name": "SidebarNav",
+    "selector": "nav[aria-label=\"Automation folders\"] > div > div > div",
+    "description": "Top nav buttons: New chat, Search, Plugins, Automations"
+  },
+  {
+    "name": "ProjectItem",
+    "selector": "[role=\"list\"] [role=\"listitem\"]:first-child",
+    "description": "Project entry with name, collapse, and nested chats"
+  },
+  {
+    "name": "MainContent",
+    "selector": "main",
+    "description": "Full main content area (Codex mobile / QR code screen)"
+  },
+  {
+    "name": "Header",
+    "selector": "main > header",
+    "description": "App header with nav controls"
+  },
+  {
+    "name": "ContentArea",
+    "selector": "main > div:nth-child(2)",
+    "description": "Central content (QR code, mobile setup)"
+  }
+]

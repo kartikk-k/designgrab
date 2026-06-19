@@ -1,0 +1,42 @@
+[
+  {
+    "name": "SettingsSidebar",
+    "selector": "nav[aria-label=\"Settings\"]",
+    "description": "Settings navigation with Personal, Integrations, Coding, Archived sections"
+  },
+  {
+    "name": "SettingsNavItem",
+    "selector": "button[aria-label=\"General\"]",
+    "description": "Single settings nav item with icon and label"
+  },
+  {
+    "name": "SettingsContent",
+    "selector": "#root > div > div > div:nth-child(2)",
+    "description": "Full settings content panel"
+  },
+  {
+    "name": "WorkModeRadioGroup",
+    "selector": "[role=\"radiogroup\"]",
+    "description": "Work mode selector: For coding / For everyday work"
+  },
+  {
+    "name": "SettingsSection",
+    "selector": "section:nth-of-type(2)",
+    "description": "Settings section (Permissions) with toggle rows"
+  },
+  {
+    "name": "ToggleRow",
+    "selector": "[role=\"switch\"]",
+    "description": "Single toggle switch control"
+  },
+  {
+    "name": "DropdownRow",
+    "selector": "button[id^=\"radix-\"]:first-of-type",
+    "description": "Dropdown selector (e.g. Default open destination)"
+  },
+  {
+    "name": "SegmentedControl",
+    "selector": "[role=\"group\"]",
+    "description": "Segmented button group (e.g. Inline/Detached, Queue/Steer)"
+  }
+]

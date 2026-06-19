@@ -314,9 +314,136 @@ capturePageBtn.addEventListener("click", async () => {
           console.warn('[DG] Error resolving CSS variables:', e.message);
         }
 
+        // --- Step 1c: Resolve computed styles on LIVE DOM for ALL elements ---
+        console.log('[DG] Step 1c: Resolving computed styles on live DOM...');
+        const _VISUAL_PROPS = [
+          'display', 'position', 'top', 'right', 'bottom', 'left', 'z-index',
+          'float', 'clear',
+          'width', 'height', 'min-width', 'min-height', 'max-width', 'max-height',
+          'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+          'padding-top', 'padding-right', 'padding-bottom', 'padding-left',
+          'overflow', 'overflow-x', 'overflow-y',
+          'flex-direction', 'flex-wrap', 'flex-grow', 'flex-shrink', 'flex-basis',
+          'align-items', 'align-self', 'justify-content', 'gap', 'order',
+          'grid-template-columns', 'grid-template-rows', 'grid-column', 'grid-row',
+          'background-color', 'background-image', 'background-size', 'background-position',
+          'color', 'font-family', 'font-size', 'font-weight', 'font-style',
+          'line-height', 'letter-spacing', 'text-align', 'text-decoration', 'text-transform',
+          'white-space', 'word-break', 'text-overflow',
+          'border-top-width', 'border-right-width', 'border-bottom-width', 'border-left-width',
+          'border-top-style', 'border-right-style', 'border-bottom-style', 'border-left-style',
+          'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color',
+          'border-top-left-radius', 'border-top-right-radius', 'border-bottom-right-radius', 'border-bottom-left-radius',
+          'box-shadow', 'opacity', 'visibility', 'cursor',
+          'vertical-align', 'backdrop-filter',
+          'object-fit', 'aspect-ratio',
+          '-webkit-line-clamp', '-webkit-box-orient',
+          'appearance', '-webkit-appearance',
+        ];
+
+        let _inlinedCount = 0;
+        for (const el of document.body.querySelectorAll('*')) {
+          const tag = el.tagName.toLowerCase();
+          if (['style', 'script', 'link', 'meta', 'title', 'noscript', 'iframe'].includes(tag)) continue;
+          if (tag === 'svg' || el.closest('svg')) continue;
+
+          const cs = window.getComputedStyle(el);
+          const parts = [];
+
+          // Pre-check: are ALL border widths 0? If so, skip all border style/color props
+          const _bwT = cs.getPropertyValue('border-top-width');
+          const _bwR = cs.getPropertyValue('border-right-width');
+          const _bwB = cs.getPropertyValue('border-bottom-width');
+          const _bwL = cs.getPropertyValue('border-left-width');
+          const _allBordersZero = (_bwT === '0px' && _bwR === '0px' && _bwB === '0px' && _bwL === '0px');
+
+          for (const prop of _VISUAL_PROPS) {
+            const val = cs.getPropertyValue(prop);
+            if (!val) continue;
+
+            // Skip ALL border style/color/width when no border is visible
+            if (_allBordersZero && /^border-(?!.*radius)/.test(prop)) continue;
+
+            // Tags that have browser defaults we MUST override
+            const _hasUAStyles = ['a', 'button', 'input', 'select', 'textarea', 'fieldset', 'legend', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'ul', 'ol', 'li', 'table', 'th', 'td', 'summary'].includes(tag);
+
+            // For elements with user-agent styles, be less aggressive about skipping
+            // Only skip the truly universal defaults
+            if (prop === 'position' && val === 'static') continue;
+            if (prop === 'z-index' && val === 'auto') continue;
+            if (prop === 'float' && val === 'none') continue;
+            if (prop === 'clear' && val === 'none') continue;
+            if (prop === 'order' && val === '0') continue;
+            if (prop === 'visibility' && val === 'visible') continue;
+            if (prop === 'backdrop-filter' && val === 'none') continue;
+            if (prop === 'object-fit' && val === 'fill') continue;
+            if (prop === 'aspect-ratio' && val === 'auto') continue;
+            if (prop === 'background-image' && val === 'none') continue;
+            if (prop === 'background-size' && val === 'auto') continue;
+            if (prop === 'background-position' && (val === '0% 0%' || val === '0px 0px')) continue;
+            if (prop === 'box-shadow' && val === 'none') continue;
+            if (prop === 'text-transform' && val === 'none') continue;
+            if (prop === 'word-break' && val === 'normal') continue;
+            if (prop === 'font-style' && val === 'normal') continue;
+            if (/^-webkit-/.test(prop) && (val === 'none' || val === 'auto')) continue;
+            if (/^grid-/.test(prop) && val === 'none') continue;
+
+            // For non-UA elements (div, span, etc.), skip more defaults
+            if (!_hasUAStyles) {
+              if (prop === 'display' && ((tag === 'div' && val === 'block') || (tag === 'span' && val === 'inline'))) continue;
+              if (prop === 'background-color' && val === 'rgba(0, 0, 0, 0)') continue;
+              if (prop === 'opacity' && val === '1') continue;
+              if (prop === 'cursor' && (val === 'auto' || val === 'default')) continue;
+              if (prop === 'vertical-align' && val === 'baseline') continue;
+              if (prop === 'text-decoration' && (val === 'none' || val.startsWith('none'))) continue;
+              if (prop === 'white-space' && val === 'normal') continue;
+              if (prop === 'text-overflow' && val === 'clip') continue;
+              if (prop === 'text-align' && val === 'start') continue;
+              if (prop === 'line-height' && val === 'normal') continue;
+              if (prop === 'letter-spacing' && val === 'normal') continue;
+              if (prop === 'flex-direction' && val === 'row') continue;
+              if (prop === 'flex-wrap' && val === 'nowrap') continue;
+              if (prop === 'flex-grow' && val === '0') continue;
+              if (prop === 'flex-shrink' && val === '1') continue;
+              if (prop === 'flex-basis' && val === 'auto') continue;
+              if (prop === 'gap' && val === 'normal') continue;
+              if (prop === 'overflow' && val === 'visible') continue;
+              if (prop === 'overflow-x' && val === 'visible') continue;
+              if (prop === 'overflow-y' && val === 'visible') continue;
+              if (prop === 'width' && val === 'auto') continue;
+              if (prop === 'height' && val === 'auto') continue;
+              if (prop === 'min-width' && (val === '0px' || val === 'auto')) continue;
+              if (prop === 'min-height' && (val === '0px' || val === 'auto')) continue;
+              if (prop === 'max-width' && val === 'none') continue;
+              if (prop === 'max-height' && val === 'none') continue;
+              if (/^margin/.test(prop) && val === '0px') continue;
+              if (/^padding/.test(prop) && val === '0px') continue;
+            }
+
+            // Always skip these regardless
+            if (/^border-.*-width$/.test(prop) && val === '0px') continue;
+            if (/^border-.*-style$/.test(prop) && val === 'none') continue;
+            if (/^border-.*-color$/.test(prop) && (val === 'rgb(0, 0, 0)' || val === 'rgba(0, 0, 0, 0)')) continue;
+            if (/^border-.*-radius$/.test(prop) && val === '0px') continue;
+
+            parts.push(prop + ':' + val);
+          }
+
+          if (parts.length > 0) {
+            el.setAttribute('data-dg-style', parts.join(';'));
+            _inlinedCount++;
+          }
+        }
+        console.log('[DG] Stored computed styles on', _inlinedCount, 'elements');
+
         // --- Step 2: Clone the DOM (now with resolved inline styles) ---
         console.log('[DG] Cloning DOM...');
         const doc = document.documentElement.cloneNode(true);
+
+        // Clean up data-dg-style from the LIVE DOM so we don't pollute the page
+        for (const el of document.body.querySelectorAll('[data-dg-style]')) {
+          el.removeAttribute('data-dg-style');
+        }
         doc.querySelectorAll('base').forEach(b => b.remove());
 
         // --- Step 3: Inline external stylesheets in the clone ---
@@ -396,6 +523,57 @@ capturePageBtn.addEventListener("click", async () => {
         // 5. Remove meta tags that aren't needed
         doc.querySelectorAll('meta[http-equiv], meta[name="robots"], meta[name="googlebot"]').forEach(m => m.remove());
 
+        // --- Step 6: Apply stored computed styles and strip CSS ---
+        console.log('[DG] Step 6: Applying stored computed styles...');
+        let inlinedCount = 0;
+        for (const el of doc.querySelectorAll('[data-dg-style]')) {
+          el.setAttribute('style', el.getAttribute('data-dg-style'));
+          el.removeAttribute('data-dg-style');
+          el.removeAttribute('class');
+          inlinedCount++;
+        }
+        // Remove class from elements without stored styles too
+        for (const el of doc.querySelectorAll('[class]')) {
+          const tag = el.tagName.toLowerCase();
+          if (['style', 'script', 'link'].includes(tag)) continue;
+          if (tag === 'svg' || el.closest('svg')) continue;
+          el.removeAttribute('class');
+        }
+
+        // Strip ALL <style> blocks — no longer needed
+        doc.querySelectorAll('style').forEach(s => s.remove());
+
+        // Add a minimal CSS reset so browser UA styles don't override inline styles
+        const resetStyle = document.createElement('style');
+        resetStyle.textContent = `
+          *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; border: 0; }
+          a { color: inherit; text-decoration: inherit; }
+          button, input, select, textarea { font: inherit; color: inherit; background: none; border: none; padding: 0; margin: 0; appearance: none; -webkit-appearance: none; }
+          img, svg { display: block; }
+          h1, h2, h3, h4, h5, h6, p { margin: 0; }
+          ul, ol { list-style: none; margin: 0; padding: 0; }
+          table { border-collapse: collapse; }
+        `;
+        const head = doc.querySelector('head');
+        if (head) head.appendChild(resetStyle);
+
+        // Keep dark class on html for color-scheme
+        const htmlEl = doc;
+        const darkClass = (htmlEl.getAttribute('class') || '').includes('dark') ? 'dark' : '';
+        if (darkClass) htmlEl.setAttribute('class', darkClass);
+        else htmlEl.removeAttribute('class');
+        const bodyEl = doc.querySelector('body');
+        if (bodyEl) bodyEl.removeAttribute('class');
+
+        // Clean up data attributes
+        for (const el of doc.querySelectorAll('*')) {
+          el.removeAttribute('data-dg-captured');
+          el.removeAttribute('data-dg-fix');
+          el.removeAttribute('data-dg-style');
+        }
+
+        console.log('[DG] Applied inline styles on', inlinedCount, 'elements');
+
         // Assemble
         const html = '<!DOCTYPE html>\n' + doc.outerHTML;
         console.log('[DG] Capture complete:', (html.length / 1024).toFixed(0) + 'KB');
@@ -452,11 +630,6 @@ captureElementBtn.addEventListener("click", async () => {
   const connected = await checkServer();
   if (!connected) return;
 
-  captureElementBtn.disabled = true;
-  capturePageBtn.disabled = true;
-  resultDiv.className = "result";
-  resultDiv.style.display = "none";
-
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     if (!tab?.id) throw new Error("No active tab");
@@ -466,105 +639,30 @@ captureElementBtn.addEventListener("click", async () => {
     const tabUrl = tab.url;
     const tabTitle = tab.title;
 
+    // Store capture context so the injected script can send directly
+    await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (url, pageUrl, pageTitle) => {
+        window.__DG_CAPTURE_CTX__ = { serverUrl: url, pageUrl, pageTitle };
+      },
+      args: [serverUrl, tabUrl, tabTitle],
+      world: "MAIN",
+    });
+
     // Inject the element picker script
-    statusText.textContent = "Pick an element...";
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       files: ["element-capture.js"],
       world: "MAIN",
     });
 
-    // Close the popup — user needs to interact with the page
-    // Poll for result from a background context
-    // Since we can't keep the popup open while user clicks,
-    // we'll poll from the popup before it closes.
-    // Actually, let's use a different approach: inject and poll.
-
-    // We need to keep checking for the result
-    statusText.textContent = "Click an element on the page (Esc to cancel)";
-
-    const pollForResult = async () => {
-      const maxAttempts = 600; // 60 seconds
-      for (let i = 0; i < maxAttempts; i++) {
-        await new Promise(r => setTimeout(r, 100));
-        try {
-          const results = await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: () => {
-              const r = window.__DG_ELEMENT_RESULT__;
-              if (r) {
-                window.__DG_ELEMENT_RESULT__ = null;
-                return r;
-              }
-              return null;
-            },
-            world: "MAIN",
-          });
-          const result = results[0]?.result;
-          if (result) return result;
-        } catch {
-          // Tab may have been closed
-          return { error: "Tab closed or unavailable" };
-        }
-      }
-      return { error: "Timeout — no element selected" };
-    };
-
-    const elementResult = await pollForResult();
-
-    if (elementResult.cancelled) {
-      statusText.textContent = "Cancelled";
-      captureElementBtn.disabled = false;
-      capturePageBtn.disabled = false;
-      return;
-    }
-
-    if (elementResult.error) {
-      throw new Error(elementResult.error);
-    }
-
-    log("Element captured:", elementResult.tag, elementResult.dimensions, elementResult.sizeKB + "KB");
-    statusText.textContent = "Sending to server...";
-
-    // Send to server
-    const res = await fetch(`${serverUrl}/capture`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        url: tabUrl,
-        data: elementResult.html,
-        title: tabTitle,
-        timestamp: Date.now(),
-        captureType: "element",
-        elementTag: elementResult.tag,
-        elementDimensions: elementResult.dimensions,
-      }),
-    });
-
-    const result = await res.json();
-    log("Server response:", result);
-    if (result.error) throw new Error(result.error);
-
-    statusText.textContent = "Element captured!";
-    resultDiv.className = "result show success";
-    resultDiv.textContent = "";
-    const strong = document.createElement("strong");
-    strong.textContent = result.site;
-    resultDiv.appendChild(strong);
-    resultDiv.appendChild(document.createElement("br"));
-    resultDiv.appendChild(
-      document.createTextNode(
-        `Saved: ${result.filename} (${result.sizeKB}KB) — <${elementResult.tag}> ${elementResult.dimensions}`
-      )
-    );
-    captureElementBtn.disabled = false;
-    capturePageBtn.disabled = false;
+    // Close popup immediately so user can interact with the page
+    // (arrow keys, clicks go to the page, not the popup)
+    window.close();
   } catch (err) {
-    log("Element capture error:", err.message, err.stack);
+    log("Element capture error:", err.message);
     statusText.textContent = "Error";
     resultDiv.className = "result show error";
     resultDiv.textContent = err.message;
-    captureElementBtn.disabled = false;
-    capturePageBtn.disabled = false;
   }
 });

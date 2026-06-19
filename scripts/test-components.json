@@ -1,0 +1,52 @@
+[
+  {
+    "name": "Sidebar",
+    "selector": "[data-slot=\"sidebar\"]",
+    "description": "Full sidebar with header, nav, session list, and footer"
+  },
+  {
+    "name": "SidebarHeader",
+    "selector": "[data-slot=\"sidebar-header\"]",
+    "description": "User menu, search button, and sidebar toggle"
+  },
+  {
+    "name": "SidebarNavItem",
+    "selector": "[data-slot=\"sidebar-header\"] nav [data-slot=\"sidebar-menu-item\"]",
+    "description": "Single navigation item (Sessions, Ask, etc.)"
+  },
+  {
+    "name": "SidebarSectionLabel",
+    "selector": "[data-slot=\"sidebar-group\"] [data-slot=\"sidebar-label-row\"]",
+    "description": "Section header row with label and action buttons (Recent + New/Search/More)"
+  },
+  {
+    "name": "SessionListItem",
+    "selector": "[data-slot=\"sidebar-group-content\"] [data-slot=\"sidebar-menu-item\"]",
+    "description": "Single session entry with two-line preview, status badge, and PR link"
+  },
+  {
+    "name": "SidebarFooter",
+    "selector": "[data-slot=\"sidebar-footer\"]",
+    "description": "Bottom bar with Upgrade, Settings, Download, Help"
+  },
+  {
+    "name": "PageHeader",
+    "selector": "#content header",
+    "description": "Top breadcrumb and action bar"
+  },
+  {
+    "name": "Composer",
+    "selector": "[data-flash-channel=\"new-session\"]",
+    "description": "Full composer card with banner, text input, toolbar, and status bar"
+  },
+  {
+    "name": "ComposerInput",
+    "selector": "[data-devin-input-box=\"true\"]",
+    "description": "Rich text input area with placeholder"
+  },
+  {
+    "name": "StatusBar",
+    "selector": "[data-flash-channel=\"new-session\"] ~ div",
+    "description": "Bottom bar with project selector, environment, upgrade, and capabilities"
+  }
+]

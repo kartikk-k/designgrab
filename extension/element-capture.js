@@ -37,6 +37,7 @@
   document.body.appendChild(label);
 
   let hoveredEl = null;
+  let locked = false; // when true, mouse movement doesn't change selection
 
   function updateOverlay(el) {
     if (!el || el === document.body || el === document.documentElement) {
@@ -56,13 +57,22 @@
     const id = el.id ? `#${el.id}` : "";
     const cls = el.className && typeof el.className === "string"
       ? "." + el.className.trim().split(/\s+/).slice(0, 2).join(".") : "";
-    label.textContent = `${tag}${id}${cls}  ${Math.round(rect.width)}x${Math.round(rect.height)}`;
+    const depth = getDepth(el);
+    const navHint = locked ? " [locked]" : "";
+    label.textContent = `${tag}${id}${cls}  ${Math.round(rect.width)}x${Math.round(rect.height)}  d:${depth}${navHint}`;
     label.style.display = "block";
     label.style.left = rect.left + "px";
     label.style.top = Math.max(0, rect.top - 24) + "px";
   }
 
+  function getDepth(el) {
+    let d = 0, n = el;
+    while (n && n !== document.body) { d++; n = n.parentElement; }
+    return d;
+  }
+
   function onMouseMove(e) {
+    if (locked) return; // arrow keys are active, ignore mouse
     const el = document.elementFromPoint(e.clientX, e.clientY);
     if (el && el !== overlay && el !== label && el !== hoveredEl) {
       hoveredEl = el;
@@ -81,10 +91,125 @@
 
   function onKeyDown(e) {
     if (e.key === "Escape") {
+      if (locked) {
+        // Unlock first, return to mouse-follow mode
+        locked = false;
+        updateOverlay(hoveredEl);
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
       e.preventDefault();
       e.stopPropagation();
       cleanup();
-      window.__DG_ELEMENT_RESULT__ = { cancelled: true };
+      console.log('[DG] Element picker cancelled');
+      return;
+    }
+
+    if (!hoveredEl) return;
+
+    // Arrow Up → select parent element
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      e.stopPropagation();
+      locked = true;
+      const parent = hoveredEl.parentElement;
+      if (parent && parent !== document.body && parent !== document.documentElement) {
+        hoveredEl = parent;
+        updateOverlay(hoveredEl);
+      }
+      return;
+    }
+
+    // Arrow Down → select first child element
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      e.stopPropagation();
+      locked = true;
+      const firstChild = hoveredEl.firstElementChild;
+      if (firstChild) {
+        hoveredEl = firstChild;
+        updateOverlay(hoveredEl);
+      }
+      return;
+    }
+
+    // Arrow Left → select previous sibling
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      e.stopPropagation();
+      locked = true;
+      const prev = hoveredEl.previousElementSibling;
+      if (prev) {
+        hoveredEl = prev;
+        updateOverlay(hoveredEl);
+      }
+      return;
+    }
+
+    // Arrow Right → select next sibling
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      e.stopPropagation();
+      locked = true;
+      const next = hoveredEl.nextElementSibling;
+      if (next) {
+        hoveredEl = next;
+        updateOverlay(hoveredEl);
+      }
+      return;
+    }
+
+    // Enter → capture current element
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      captureCurrentElement();
+      return;
+    }
+  }
+
+  async function captureCurrentElement() {
+    const el = hoveredEl;
+    cleanup();
+    if (!el) return;
+
+    try {
+      const result = extractElement(el);
+      console.log('[DG] Element captured:', result.tag, result.dimensions, result.sizeKB + 'KB');
+      console.log('[DG] Structure:\n' + result.outline);
+      console.log('[DG] Element HTML:\n', result.html);
+
+      // Send directly to server
+      const ctx = window.__DG_CAPTURE_CTX__;
+      if (!ctx || !ctx.serverUrl) {
+        console.warn('[DG] No capture context found, storing result on window');
+        window.__DG_ELEMENT_RESULT__ = result;
+        return;
+      }
+
+      const res = await fetch(`${ctx.serverUrl}/capture`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          url: ctx.pageUrl,
+          data: result.html,
+          title: ctx.pageTitle,
+          timestamp: Date.now(),
+          captureType: "element",
+          elementTag: result.tag,
+          elementDimensions: result.dimensions,
+        }),
+      });
+
+      const serverResult = await res.json();
+      if (serverResult.error) {
+        console.error('[DG] Server error:', serverResult.error);
+      } else {
+        console.log(`[DG] Saved: ${serverResult.site}/${serverResult.filename} (${serverResult.sizeKB}KB)`);
+      }
+    } catch (err) {
+      console.error('[DG] Capture error:', err.message);
     }
   }
 
@@ -92,20 +217,7 @@
     e.preventDefault();
     e.stopPropagation();
     e.stopImmediatePropagation();
-    const el = hoveredEl;
-    cleanup();
-    if (!el) {
-      window.__DG_ELEMENT_RESULT__ = { cancelled: true };
-      return;
-    }
-    try {
-      const result = extractElement(el);
-      console.log('[DG] Element captured:', result.tag, result.dimensions, result.sizeKB + 'KB');
-      console.log('[DG] Element HTML:\n', result.html);
-      window.__DG_ELEMENT_RESULT__ = result;
-    } catch (err) {
-      window.__DG_ELEMENT_RESULT__ = { error: err.message };
-    }
+    captureCurrentElement();
   }
 
   document.addEventListener("mousemove", onMouseMove, true);
@@ -667,13 +779,17 @@
     // Page background
     const bodyBg = window.getComputedStyle(document.body).backgroundColor;
     const htmlBg = window.getComputedStyle(document.documentElement).backgroundColor;
-    const pageBg = (bodyBg && bodyBg !== "rgba(0, 0, 0, 0)") ? bodyBg
+    const rawPageBg = (bodyBg && bodyBg !== "rgba(0, 0, 0, 0)") ? bodyBg
       : (htmlBg && htmlBg !== "rgba(0, 0, 0, 0)") ? htmlBg : "#ffffff";
+    const pageBg = normalizeColor(rawPageBg);
 
     const rect = el.getBoundingClientRect();
 
     // Convert inline styles to Tailwind classes
     convertToTailwind(clone);
+
+    // Generate structural outline
+    const outline = generateOutline(clone);
 
     // Build output
     const cssBlocks = [];
@@ -695,6 +811,11 @@
 ${cssBlocks.join("\n")}
 </style>
 </head>
+<!--
+STRUCTURE
+─────────
+${outline}
+-->
 <body class="bg-[var(--color-page-bg)] flex items-center justify-center min-h-screen p-10">
 ${clone.outerHTML}
 </body>
@@ -702,6 +823,7 @@ ${clone.outerHTML}
 
     return {
       html,
+      outline,
       tag: el.tagName.toLowerCase(),
       dimensions: `${Math.round(rect.width)}x${Math.round(rect.height)}`,
       sizeKB: (html.length / 1024).toFixed(0),
@@ -800,7 +922,48 @@ ${clone.outerHTML}
     return pairs;
   }
 
+  // Convert modern color formats (oklab, oklch, lch, lab) to rgba
+  const _colorCanvas = document.createElement("canvas");
+  _colorCanvas.width = 1; _colorCanvas.height = 1;
+  const _colorCtx = _colorCanvas.getContext("2d");
+
+  function normalizeColor(val) {
+    if (!val) return val;
+    // Only convert if it uses a modern color function
+    if (!/^(oklab|oklch|lch|lab|color)\(/i.test(val)) return val;
+    try {
+      _colorCtx.clearRect(0, 0, 1, 1);
+      _colorCtx.fillStyle = "#000";
+      _colorCtx.fillStyle = val;
+      _colorCtx.fillRect(0, 0, 1, 1);
+      const [r, g, b, a] = _colorCtx.getImageData(0, 0, 1, 1).data;
+      if (a === 0 && val.includes("/")) {
+        // Canvas doesn't preserve alpha from oklab() — parse it manually
+        const alphaMatch = val.match(/\/\s*([\d.]+)\s*\)/);
+        if (alphaMatch) {
+          const alpha = parseFloat(alphaMatch[1]);
+          return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+      }
+      return a < 255 ? `rgba(${r}, ${g}, ${b}, ${(a / 255).toFixed(2)})` : `rgb(${r}, ${g}, ${b})`;
+    } catch {
+      return val;
+    }
+  }
+
   function cssToTailwind(prop, val) {
+    // Normalize modern color formats for color-related properties
+    const COLOR_PROPS = new Set([
+      "color", "background-color", "border-top-color", "border-right-color",
+      "border-bottom-color", "border-left-color", "fill", "stroke",
+      "-webkit-text-fill-color", "outline-color",
+    ]);
+    if (COLOR_PROPS.has(prop)) val = normalizeColor(val);
+    // Also normalize colors inside box-shadow values
+    if (prop === "box-shadow" && /oklab|oklch|lch|lab|color\(/i.test(val)) {
+      val = val.replace(/(oklab|oklch|lch|lab|color)\([^)]+\)/gi, m => normalizeColor(m));
+    }
+
     // ─── Display ───
     if (prop === "display") {
       const map = { flex: "flex", grid: "grid", block: "block", inline: "inline",
@@ -1047,6 +1210,216 @@ ${clone.outerHTML}
     const parts = val.split(/\s+/);
     if (parts.length === 1) return `rounded-[${val}]`;
     return `rounded-[${val.replace(/\s/g, "_")}]`;
+  }
+
+  // ─── Structural outline generator ───
+
+  function generateOutline(root) {
+    const lines = [];
+    walk(root, 0, lines);
+    return lines.join("\n");
+  }
+
+  function walk(el, depth, lines) {
+    if (!el || el.nodeType !== 1) return;
+    const tag = el.tagName.toLowerCase();
+
+    // Skip SVG internals — just show the <svg> itself
+    if (tag !== "svg" && el.closest && el.ownerSVGElement) return;
+
+    const indent = "    ".repeat(depth);
+    const label = describeElement(el);
+
+    // Check if this is a leaf (no element children, or only SVG/text)
+    const children = [...el.children].filter(c => {
+      const t = c.tagName.toLowerCase();
+      // Skip SVG internals
+      if (c.ownerSVGElement) return false;
+      return true;
+    });
+
+    const selector = getUniqueSelector(el);
+    const selectorPart = ` [${selector}]`;
+
+    if (children.length === 0) {
+      // Leaf node — show on one line
+      const text = getTextPreview(el);
+      const textPart = text ? ` "${text}"` : "";
+      lines.push(`${indent}<${tag}>${label}${selectorPart}${textPart}`);
+    } else {
+      // Container — show open/close with children
+      lines.push(`${indent}<${tag}>${label}${selectorPart}`);
+      for (const child of children) {
+        walk(child, depth + 1, lines);
+      }
+    }
+  }
+
+  function getUniqueSelector(el) {
+    const parts = [];
+    let current = el;
+    while (current && current.nodeType === 1) {
+      const tag = current.tagName.toLowerCase();
+
+      // If element has a meaningful id, use it and stop
+      if (current.id && !/^(base-ui|radix)/.test(current.id)) {
+        parts.unshift(`#${current.id}`);
+        break;
+      }
+
+      // If element has data-slot, use it
+      const slot = current.getAttribute("data-slot");
+      if (slot) {
+        parts.unshift(`[data-slot="${slot}"]`);
+        break;
+      }
+
+      // If element has aria-label, use it
+      const ariaLabel = current.getAttribute("aria-label");
+      if (ariaLabel) {
+        parts.unshift(`${tag}[aria-label="${ariaLabel}"]`);
+        break;
+      }
+
+      // Use tag + nth-child for position
+      const parent = current.parentElement;
+      if (!parent) {
+        parts.unshift(tag);
+        break;
+      }
+
+      const siblings = [...parent.children].filter(c => c.tagName === current.tagName);
+      if (siblings.length === 1) {
+        parts.unshift(tag);
+      } else {
+        const idx = siblings.indexOf(current) + 1;
+        parts.unshift(`${tag}:nth-child(${[...parent.children].indexOf(current) + 1})`);
+      }
+
+      current = parent;
+      // Stop at body or after 4 levels (keep selectors readable)
+      if (tag === "body" || parts.length >= 4) break;
+    }
+    return parts.join(" > ");
+  }
+
+  function describeElement(el) {
+    const parts = [];
+    const tag = el.tagName.toLowerCase();
+    const classes = el.getAttribute("class") || "";
+
+    // Infer role/purpose from attributes, content, and styles
+    const role = el.getAttribute("role");
+    const ariaLabel = el.getAttribute("aria-label");
+    const dataSlot = el.getAttribute("data-slot");
+    const type = el.getAttribute("type");
+    const href = el.getAttribute("href");
+    const id = el.id;
+
+    // Get display/layout from classes
+    const isFlex = classes.includes("flex ") || classes.includes("flex-");
+    const isGrid = classes.includes("grid ");
+    const layout = isGrid ? "grid" : isFlex ? "flex" : null;
+
+    // Determine direction
+    const isCol = classes.includes("flex-col");
+    const direction = isCol ? "column" : null;
+
+    // Background?
+    const hasBg = classes.includes("bg-[") || classes.includes("bg-");
+    // Border/rounded?
+    const hasRounded = classes.includes("rounded-");
+    const hasBorder = classes.includes("border-") || classes.includes("border ");
+    const hasShadow = classes.includes("shadow-[");
+
+    // Try to infer a semantic description
+    let desc = "";
+
+    // From explicit attributes
+    if (dataSlot) {
+      desc = dataSlot.replace(/-/g, " ");
+    } else if (ariaLabel) {
+      desc = ariaLabel;
+    } else if (role && role !== "button" && role !== "presentation") {
+      desc = role;
+    } else if (tag === "nav") {
+      desc = "navigation";
+    } else if (tag === "button") {
+      const text = getTextPreview(el);
+      desc = text ? `button: ${text}` : "button";
+    } else if (tag === "a" && href) {
+      const text = getTextPreview(el);
+      desc = text ? `link: ${text}` : `link → ${href}`;
+    } else if (tag === "input") {
+      desc = `input[${type || "text"}]`;
+    } else if (tag === "img") {
+      desc = `image`;
+    } else if (tag === "svg") {
+      desc = "icon";
+    } else if (tag === "ul" || tag === "ol") {
+      const count = el.children.length;
+      desc = `list (${count} items)`;
+    } else if (tag === "li") {
+      desc = "list item";
+    } else if (tag === "h1" || tag === "h2" || tag === "h3" || tag === "h4") {
+      desc = "heading";
+    } else if (tag === "p") {
+      desc = "paragraph";
+    } else if (tag === "section") {
+      const sectionId = el.id;
+      desc = sectionId ? `section#${sectionId}` : "section";
+    } else if (tag === "form") {
+      desc = "form";
+    } else {
+      // Infer from structure
+      if (hasBg && hasRounded && (hasBorder || hasShadow)) {
+        desc = "card";
+      } else if (layout) {
+        // Try to guess purpose from children count and layout
+        const childCount = el.children.length;
+        if (isCol && childCount > 3) {
+          desc = "stack";
+        } else if (!isCol && childCount === 2) {
+          // Could be a row with label + action
+          desc = "row";
+        } else if (!isCol && childCount > 2) {
+          desc = "toolbar";
+        } else if (isCol) {
+          desc = "group";
+        } else {
+          desc = "container";
+        }
+      }
+    }
+
+    // Build the annotation
+    if (desc) parts.push(desc);
+
+    // Add layout info if container
+    if (layout && !["button", "a", "input"].includes(tag)) {
+      const layoutDesc = direction ? `${layout}-${direction}` : layout;
+      if (!desc.includes(layout)) parts.push(layoutDesc);
+    }
+
+    // Add gap if present
+    const gapMatch = classes.match(/gap-\[(\d+)/);
+    if (gapMatch) parts.push(`gap:${gapMatch[1]}px`);
+
+    return parts.length ? " -- " + parts.join(", ") : "";
+  }
+
+  function getTextPreview(el) {
+    // Get direct text content (not from children)
+    let text = "";
+    for (const node of el.childNodes) {
+      if (node.nodeType === 3) {
+        const t = node.textContent.trim();
+        if (t) text += t + " ";
+      }
+    }
+    text = text.trim();
+    if (text.length > 40) text = text.substring(0, 37) + "...";
+    return text;
   }
 
   function getPseudoStyle(cs) {
