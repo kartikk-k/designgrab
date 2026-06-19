@@ -115,15 +115,59 @@ function isGlobalSelector(selector: string): boolean {
     elementResets.test(s);
 }
 
+// ═══ Pre-scan: find which @keyframes and @font-face are actually used ═══
+const usedAnimations = new Set<string>();
 for (const block of styleBlocks) {
-  // Handle @font-face
-  for (const m of block.matchAll(/@font-face\s*\{[^}]*\}/g)) {
+  for (const m of block.matchAll(/animation(?:-name)?:\s*([^;}"]+)/g)) {
+    for (const a of m[1].split(",")) {
+      const name = a.trim().split(/\s+/)[0];
+      if (name && name !== "none") usedAnimations.add(name);
+    }
+  }
+}
+
+// Find which font families are referenced in HTML body
+const bodyContent = htmlShell.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1] || "";
+const usedFontFamilies = new Set<string>();
+for (const m of html.matchAll(/font-family:\s*([^;}"]+)/g)) {
+  for (const f of m[1].split(",")) {
+    usedFontFamilies.add(f.trim().replace(/['"]/g, "").toLowerCase());
+  }
+}
+// Also check class names that reference fonts
+for (const m of bodyContent.matchAll(/class="([^"]*)"/g)) {
+  for (const c of m[1].split(/\s+/)) {
+    if (c.startsWith("font-")) usedFontFamilies.add(c);
+  }
+}
+
+for (const block of styleBlocks) {
+  // Handle @font-face — remove fonts confirmed unused on this page
+  for (const m of block.matchAll(/@font-face\s*\{([^}]*)\}/g)) {
+    const ffBody = m[1];
+    const familyMatch = ffBody.match(/font-family:\s*([^;]+)/);
+    const family = familyMatch ? familyMatch[1].trim().replace(/['"]/g, "").toLowerCase() : "";
+    const fontStyleMatch = ffBody.match(/font-style:\s*([^;]+)/);
+    const fontStyle = fontStyleMatch ? fontStyleMatch[1].trim().toLowerCase() : "normal";
+
+    // Skip: seti font (VS Code file icons — not used in dashboard pages)
+    if (family === "seti") continue;
+    // Skip: codicon font (the .codicon class actually uses cursor-icons, not this font)
+    if (family === "codicon") continue;
+    // Skip: italic font variants (not used on typical dashboard pages)
+    if (fontStyle === "italic") continue;
+    // Skip: duplicate cursor-icons-16 (same as cursor-icons)
+    if (family === "cursor-icons-16") continue;
+
     addRule(m[0]);
   }
 
-  // Handle @keyframes
-  for (const m of block.matchAll(/@keyframes\s+[a-zA-Z0-9_-]+\s*\{[\s\S]*?(?:\{[^}]*\}[\s\S]*?)*\}/g)) {
-    addRule(m[0]);
+  // Handle @keyframes — only keep animations that are referenced
+  for (const m of block.matchAll(/@keyframes\s+([a-zA-Z0-9_-]+)\s*\{[\s\S]*?(?:\{[^}]*\}[\s\S]*?)*\}/g)) {
+    const name = m[1];
+    if (usedAnimations.has(name)) {
+      addRule(m[0]);
+    }
   }
 
   // Handle @media blocks — need to handle nested braces properly
