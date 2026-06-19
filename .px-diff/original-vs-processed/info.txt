@@ -1,0 +1,28 @@
+px-diff
+
+localhost:8889/original.html  vs  localhost:8889/tw-processed.html
+Viewport: 1440x900
+Rendered: 1440x1803
+
+Difference: 0.10%
+Match: 99.90%
+Mismatched pixels: 2,571 / 2,596,320
+
+Diff regions: 7
+
+  Region 1: position (1280, 664) size 72x12
+    Image: region-1-diff.png  (side-by-side: localhost:8889/original.html left, localhost:8889/tw-processed.html right)
+  Region 2: position (1232, 728) size 120x12
+    Image: region-2-diff.png  (side-by-side: localhost:8889/original.html left, localhost:8889/tw-processed.html right)
+  Region 3: position (245, 868) size 10x2
+    Image: region-3-diff.png  (side-by-side: localhost:8889/original.html left, localhost:8889/tw-processed.html right)
+  Region 4: position (1200, 987) size 152x11
+    Image: region-4-diff.png  (side-by-side: localhost:8889/original.html left, localhost:8889/tw-processed.html right)
+  Region 5: position (1279, 1051) size 73x12
+    Image: region-5-diff.png  (side-by-side: localhost:8889/original.html left, localhost:8889/tw-processed.html right)
+  Region 6: position (1327, 1176) size 32x20
+    Image: region-6-diff.png  (side-by-side: localhost:8889/original.html left, localhost:8889/tw-processed.html right)
+  Region 7: position (1187, 1490) size 165x9
+    Image: region-7-diff.png  (side-by-side: localhost:8889/original.html left, localhost:8889/tw-processed.html right)
+
+Full overlay: diff-full.png  (localhost:8889/tw-processed.html with red outlines on diff regions)

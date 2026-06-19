@@ -341,6 +341,37 @@ capturePageBtn.addEventListener("click", async () => {
           if (head) head.appendChild(style);
         }
 
+        // --- Step 4c: Embed fonts as data URIs ---
+        console.log('[DG] Embedding fonts...');
+        let _fontsEmbedded = 0;
+        for (const styleEl of doc.querySelectorAll('style')) {
+          let css = styleEl.textContent || '';
+          // Find all url() references to font files
+          const fontUrls = [...css.matchAll(/url\(["']?([^"')\s]+\.(?:woff2?|ttf|otf|eot)[^"')\s]*)["']?\)/g)];
+          for (const m of fontUrls) {
+            const url = m[1];
+            if (url.startsWith('data:')) continue; // Already embedded
+            try {
+              // Resolve relative URLs against the page's base URI
+              const absUrl = new URL(url, baseURI).href;
+              const res = await fetch(absUrl);
+              if (!res.ok) { console.warn('[DG] Font fetch failed:', absUrl, res.status); continue; }
+              const blob = await res.blob();
+              const reader = new FileReader();
+              const dataUri = await new Promise((resolve) => {
+                reader.onload = () => resolve(reader.result);
+                reader.readAsDataURL(blob);
+              });
+              css = css.split(m[0]).join('url("' + dataUri + '")');
+              _fontsEmbedded++;
+            } catch (e) {
+              console.warn('[DG] Font embed failed:', url, e.message);
+            }
+          }
+          styleEl.textContent = css;
+        }
+        console.log('[DG] Embedded', _fontsEmbedded, 'fonts');
+
         // --- Step 5: STRIP all scripts ---
         console.log('[DG] Stripping scripts...');
         doc.querySelectorAll('script').forEach(s => s.remove());
